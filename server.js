@@ -5,7 +5,7 @@ import mongoose from 'mongoose'
 import crypto from 'crypto'
 import bcrypt from 'bcrypt-nodejs'
 
-
+const SALT = bcrypt.genSaltSync(10)
 const mongoUrl = process.env.MONGO_URL || "mongodb://localhost/authCodealong"
 mongoose.connect(mongoUrl, { useNewUrlParser: true, useUnifiedTopology: true })
 mongoose.Promise = Promise
@@ -32,12 +32,16 @@ const User = mongoose.model('User', {
 })
 
 const authenticteUser = async (req, res, next) => {
-  const user = await User.findOne({accessToken: req.header('Authprization')})
-  if(user){
-    req.user = user
-    next()
-  }else {
-    res.status(401).json({loggedOut:true})
+  try {
+    const user = await User.findOne({accessToken: req.header('Authprization')})
+    if(user){
+      req.user = user
+      next()
+    }else {
+      res.status(401).json({loggedOut:true})
+    }
+  } catch (err) {
+    res.status(403).json({ message: 'no account found', errors:err.errors})
   }
 }
 
@@ -57,7 +61,7 @@ app.get('/', (req, res) => {
 app.post('/users', async (req,res) => {
   try{
     const {name, email, password} = req.body
-    const user = new User({name, email, password: bcrypt.hashSync(password)})
+    const user = new User({name, email, password: bcrypt.hashSync(password, SALT)})
     user.save()
     res.status(201).json({id: user._id, accessToken: user.accessToken})
 
